@@ -1,0 +1,81 @@
+name: build-jcg-q30
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            gcc-aarch64-linux-gnu build-essential flex bison libssl-dev \
+            device-tree-compiler bc rename nodejs npm
+
+      - name: Prepare config
+        run: |
+          cat > .config <<'EOF'
+          CONFIG_BUILD_FIP=y
+          # CONFIG_BUILD_ATF is not set
+          # CONFIG_BUILD_GPT is not set
+          # CONFIG_VERSION_2025 is not set
+          # CONFIG_VERSION_SP1 is not set
+          CONFIG_VERSION_SP2=y
+          CONFIG_SILENT=y
+          CONFIG_BUILD_LOG=y
+          CONFIG_COPY_BL2=y
+          # CONFIG_MULTI_LAYOUT is not set
+          CONFIG_FIXED_MTDPARTS=y
+          CONFIG_TOOLCHAIN="aarch64-linux-gnu-"
+          CONFIG_OUTPUT_DIR="output"
+          CONFIG_ATFCFG_DIR="mt798x_atf"
+          CONFIG_CFG_SUBDIR="normal"
+          EOF
+          sed -i 's/^ *//' .config
+          cat .config
+
+      - name: Build BL2 + FIP (jcg_q30, SP2, ubootmod)
+        run: |
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export TOOLCHAIN=aarch64-linux-gnu-
+          make BOARD=jcg_q30 VERSION=SP2 VARIANT=ubootmod MULTI_LAYOUT=0 FIXED_MTDPARTS=1 TOOLCHAIN=aarch64-linux-gnu- build
+
+      - name: Collect outputs
+        run: |
+          ls -lh output
+          mkdir -p upload
+          cp -r output/* upload/
+          ls -lh upload
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jcg_q30-SP2-ubootmod
+          path: upload/*
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-jcg-q30-${{ github.run_number }}
+          name: jcg_q30 SP2 ubootmod BL2+FIP
+          body: |
+            Auto build for JCG Q30 PRO
+            - BOARD: jcg_q30
+            - VERSION: SP2 (ATF 20260123)
+            - VARIANT: ubootmod (FIT, spi-nand raw partition)
+            - MULTI_LAYOUT: 0, FIXED_MTDPARTS: 1
+          files: upload/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
