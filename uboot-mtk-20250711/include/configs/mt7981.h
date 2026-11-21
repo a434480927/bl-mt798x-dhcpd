@@ -17,15 +17,20 @@
 #endif
 
 /*
- * Boot straight into the installed system.
+ * Built-in defaults, so a cold boot works even with an empty environment.
  *
- * mtkautoboot only *displays* the bootmenu command that pauses
- * indefinitely waiting for a key press, which this board cannot provide
- * (no serial console attached), so autoboot never reached the system.
- * mtkboardboot is the menu's own "Startup system (Default)" command.
+ * bootcmd: mtkautoboot only *displays* the bootmenu; mtkboardboot is the
+ * menu's "Startup system (Default)" command and boots the FIT directly.
+ *
+ * glbtn_key: the board has "reset" and "mesh" buttons in its DT (no "wps").
+ * The stock list "reset,wps,mesh" makes glbtn fall back to the mesh button,
+ * which reads as held down on this hardware, so the web failsafe UI was
+ * started on every cold boot before autoboot could run. Restrict the
+ * failsafe trigger key to reset.
  */
 #define CFG_EXTRA_ENV_SETTINGS	\
 	FIT_BOOT_CONF_ENV \
-	"bootcmd=mtkboardboot\0"
+	"bootcmd=mtkboardboot\0" \
+	"glbtn_key=reset\0"
 
 #endif
