@@ -6,7 +6,6 @@
  *
  * Generic autoboot menu command
  */
-
 #include <command.h>
 #include <env.h>
 #include <menu.h>
@@ -47,7 +46,6 @@ void set_bootmenu_repeat(const char *fmt, ...)
 	do {
 		tmr = timer_get_us();
 		remains = (uint32_t)((tmo - tmr + USEC_PER_SEC - 1) / USEC_PER_SEC);
-
 		if (remains < last_remains) {
 			printf("\rReturning to bootmenu in %us ...", remains);
 			last_remains = remains;
@@ -60,7 +58,6 @@ void set_bootmenu_repeat(const char *fmt, ...)
 	} while (tmr < tmo);
 
 	printf("\n");
-
 	repeat_menu = true;
 }
 
@@ -71,12 +68,9 @@ static int do_mtkautoboot(struct cmd_tbl *cmdtp, int flag, int argc,
 	char key[16];
 	char val[256];
 	int delay = -1;
-#ifdef CONFIG_MEDIATEK_BOOTMENU_COUNTDOWN
 	const char *delay_str;
-#endif
 
 	board_bootmenu_entries(&menu_entries, &menu_count);
-
 	if (!menu_entries || !menu_count) {
 		printf("mtkautoboot is not configured!\n");
 		return CMD_RET_FAILURE;
@@ -85,7 +79,7 @@ static int do_mtkautoboot(struct cmd_tbl *cmdtp, int flag, int argc,
 	for (i = 0; i < menu_count; i++) {
 		snprintf(key, sizeof(key), "bootmenu_%d", i);
 		snprintf(val, sizeof(val), "%s=%s",
-			 menu_entries[i].desc, menu_entries[i].cmd);
+				 menu_entries[i].desc, menu_entries[i].cmd);
 		env_set(key, val);
 	}
 
@@ -96,13 +90,17 @@ static int do_mtkautoboot(struct cmd_tbl *cmdtp, int flag, int argc,
 	snprintf(key, sizeof(key), "bootmenu_%d", i);
 	env_set(key, NULL);
 
-#ifdef CONFIG_MEDIATEK_BOOTMENU_COUNTDOWN
+	/*
+	 * Always run the menu with a timeout: a bare "mtkautoboot" with no
+	 * countdown calls menu_show(-1), which waits forever for a key press.
+	 * On headless boards that never happens, so autoboot never reaches
+	 * bootcmd and the web failsafe UI takes over.
+	 */
 	delay_str = env_get("bootmenu_delay");
 	if (delay_str)
 		delay = simple_strtol(delay_str, NULL, 10);
 	else
 		delay = CONFIG_MEDIATEK_BOOTMENU_DELAY;
-#endif
 
 	in_menu = true;
 
