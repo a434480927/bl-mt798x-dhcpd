@@ -16,8 +16,16 @@
 #define FIT_BOOT_CONF_ENV
 #endif
 
+/*
+ * Boot straight into the installed system.
+ *
+ * mtkautoboot only *displays* the bootmenu command that pauses
+ * indefinitely waiting for a key press, which this board cannot provide
+ * (no serial console attached), so autoboot never reached the system.
+ * mtkboardboot is the menu's own "Startup system (Default)" command.
+ */
 #define CFG_EXTRA_ENV_SETTINGS	\
 	FIT_BOOT_CONF_ENV \
-	"bootcmd=mtkautoboot\0"
+	"bootcmd=mtkboardboot\0"
 
 #endif
