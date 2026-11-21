@@ -17,6 +17,7 @@
 #endif
 
 #define CFG_EXTRA_ENV_SETTINGS	\
-	FIT_BOOT_CONF_ENV
+	FIT_BOOT_CONF_ENV \
+	"bootcmd=mtkautoboot\0"
 
 #endif
