@@ -1,0 +1,97 @@
+name: build-n60-pro
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - '.github/workflows/build-n60-pro.yml'
+      - 'uboot-mtk-20250711/include/configs/mt7986.h'
+      - 'uboot-mtk-20250711/configs-fit/mt7986_netcore_n60-pro_defconfig'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            gcc-aarch64-linux-gnu build-essential flex bison libssl-dev \
+            device-tree-compiler bc rename nodejs npm
+
+      - name: Prepare config
+        run: |
+          cat > .config <<'EOF'
+          CONFIG_BUILD_FIP=y
+          # CONFIG_BUILD_ATF is not set
+          # CONFIG_BUILD_GPT is not set
+          # CONFIG_VERSION_2025 is not set
+          # CONFIG_VERSION_SP1 is not set
+          CONFIG_VERSION_SP2=y
+          CONFIG_SILENT=y
+          CONFIG_BUILD_LOG=y
+          CONFIG_COPY_BL2=y
+          # CONFIG_MULTI_LAYOUT is not set
+          CONFIG_FIXED_MTDPARTS=y
+          CONFIG_TOOLCHAIN="aarch64-linux-gnu-"
+          CONFIG_OUTPUT_DIR="output"
+          CONFIG_ATFCFG_DIR="mt798x_atf"
+          CONFIG_CFG_SUBDIR="normal"
+          EOF
+          sed -i 's/^ *//' .config
+          cat .config
+
+      - name: Build BL2 + FIP (netcore_n60-pro, SP2, ubootmod)
+        run: |
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export TOOLCHAIN=aarch64-linux-gnu-
+          make BOARD=netcore_n60-pro VERSION=SP2 VARIANT=ubootmod MULTI_LAYOUT=0 TOOLCHAIN=aarch64-linux-gnu- build
+
+      - name: Collect outputs
+        run: |
+          ls -lh output
+          mkdir -p upload
+          cp -r output/* upload/
+          ls -lh upload
+          for f in output/fip-*.bin; do
+            [ -f "$f" ] || continue
+            size=$(stat -c%s "$f")
+            echo "FIP: $f ($size bytes)"
+            if [ "$size" -ge 2097152 ]; then
+              echo "::error::FIP is ${size} bytes, larger than the 2MiB fip partition"
+              exit 1
+            fi
+          done
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: netcore_n60-pro-SP2-ubootmod
+          path: upload/*
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-n60-pro-${{ github.run_number }}
+          name: netcore_n60-pro SP2 ubootmod BL2+FIP
+          body: |
+            Auto build for Netcore N60 Pro (MT7986A, 512MB DDR4, 128MB SPI-NAND)
+            - BOARD: netcore_n60-pro
+            - VERSION: SP2 (ATF 20260123), U-Boot 2025.07
+            - VARIANT: ubootmod (FIT in ubi volume, env in ubi volumes)
+            - MULTI_LAYOUT: 0, FIXED_MTDPARTS: ignored (forced off by ubootmod)
+            - mtdparts: bl2 1M / u-boot-env 512K / factory 2M / fip 2M / ubi 122.5M
+            - built-in env: bootcmd=mtkboardboot, glbtn_key=reset
+            Flash only the FIP first; keep the stock BL2 (DDR4) unless needed.
+          files: upload/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
