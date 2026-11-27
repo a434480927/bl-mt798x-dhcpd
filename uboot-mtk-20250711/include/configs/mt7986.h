@@ -16,7 +16,21 @@
 #define FIT_BOOT_CONF_ENV
 #endif
 
+/*
+ * Built-in defaults, so a cold boot works even with an empty environment.
+ *
+ * bootcmd: mtkautoboot only *displays* the bootmenu; mtkboardboot is the
+ * menu's "Startup system (Default)" command and boots the FIT directly.
+ *
+ * glbtn_key: the MT7986 boards here (netcore N60 Pro) have "reset" and
+ * "mesh" buttons in their DT, no "wps". The stock list "reset,wps,mesh"
+ * makes glbtn fall back to a key that reads as held down, so the web
+ * failsafe UI could start before autoboot runs. Restrict the failsafe
+ * trigger key to reset.
+ */
 #define CFG_EXTRA_ENV_SETTINGS	\
-	FIT_BOOT_CONF_ENV
+	FIT_BOOT_CONF_ENV \
+	"bootcmd=mtkboardboot\0" \
+	"glbtn_key=reset\0"
 
 #endif
